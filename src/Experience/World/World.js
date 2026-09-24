@@ -1,4 +1,7 @@
 import Experience from '../Experience'
+import Environment from './Environment'
+import Terrain from './Terrain'
+import Grass from './Grass'
 import Sphere from './Sphere'
 
 export default class World
@@ -9,21 +12,13 @@ export default class World
         this.scene = this.experience .scene
         this.ressources = this.experience.ressources
 
-        // Doesn't need any ressources
-        this.sphere = new Sphere()
-
-        // Wait for ressources
-        // this.ressources.on('loaded', () => 
-        // {
-        //     // Setup
-        // })
-
+        this.environment = new Environment()
+        this.terrain = new Terrain()
+        this.grass = new Grass(this.terrain)
     }
 
     update()
     {
-        if(this.fox){
-            this.fox.update()
-        }
+        this.grass.update()
     }
 }
