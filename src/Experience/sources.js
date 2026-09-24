@@ -1,12 +1,7 @@
 export default [
-    // {
-    //     name: 'grassNormalTexture',
-    //     type: 'texture',
-    //     path: 'textures/dirt/normal.jpg',
-    // },
-    // {
-    //     name: 'foxModel',
-    //     type: 'gltfModel',
-    //     path: 'models/Fox/glTF/Fox.gltf'
-    // },
+    {
+        name: 'snakeModel',
+        type: 'gltfModel',
+        path: 'models/snakecolor.glb'
+    },
 ]
