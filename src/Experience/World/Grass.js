@@ -1,16 +1,17 @@
 import * as THREE from 'three/webgpu'
-import { Fn, instancedArray, instanceIndex, hash, vec2, vec3, uniform, cameraPosition, positionLocal, uv, mix, mx_noise_float } from 'three/tsl'
+import { Fn, instancedArray, instanceIndex, hash, float, vec2, vec3, uniform, cameraPosition, positionLocal, uv, mix, mx_noise_float, Loop, If } from 'three/tsl'
 
 import Experience from '../Experience'
 
 export default class Grass
 {
-    constructor(terrain)
+    constructor(terrain, snake)
     {
         this.experience = new Experience()
         this.scene = this.experience.scene
         this.debug = this.experience.debug
         this.terrain = terrain
+        this.snake = snake
 
         if(this.debug.active)
         {
@@ -52,6 +53,12 @@ export default class Grass
             colorNoiseFolder.add(this.uniforms.colorNoiseAmplitude, 'value').min(0).max(2).step(0.01).name('colorNoiseAmplitude')
             colorNoiseFolder.add(this.uniforms.tintStrength, 'value').min(0).max(5).step(0.01).name('tintStrength')
             colorNoiseFolder.addColor(debugObject, 'colorTint').onChange(() => this.uniforms.colorTint.value.set(debugObject.colorTint))
+
+            const bendFolder = this.debugFolder.addFolder("snake bend")
+            bendFolder.add(this.uniforms.bendRadius, 'value').min(0.01).max(2).step(0.01).name('bendRadius')
+            bendFolder.add(this.uniforms.bendStrength, 'value').min(0).max(2).step(0.01).name('bendStrength')
+            bendFolder.add(this.uniforms.shrinkRadius, 'value').min(0.01).max(2).step(0.01).name('shrinkRadius')
+            bendFolder.add(this.uniforms.shrinkHeight, 'value').min(0).max(1).step(0.01).name('shrinkHeight')
         }
     }
 
@@ -69,9 +76,11 @@ export default class Grass
         const spacing = this.terrain.size / this.gridSize
 
         this.positions = instancedArray(this.count, 'vec3')
+        this.bends = instancedArray(this.count, 'vec3') // per blade : x, y = push direction, z = distance to the snake
 
         this.computeUpdate = Fn(() =>
         {
+            // position
             const index = instanceIndex.toFloat()
             const column = index.mod(this.gridSize)
             const row = index.div(this.gridSize).floor()
@@ -81,8 +90,30 @@ export default class Grass
             ).sub(0.5)
             const xz = vec2(column, row).sub((this.gridSize - 1) / 2).add(jitter).mul(spacing)
             const elevation = this.terrain.elevationNode(xz)
-
             this.positions.element(instanceIndex).assign(vec3(xz.x, elevation, xz.y))
+
+            // bend
+            // Find the closest snake sample : check every sample, keep it each time one is nearer than the best so far
+            const closestDistance = float(9999).toVar() // distance from this blade's base to the nearest snake sample
+            const closestPoint = vec2(0).toVar() // position (x, z) of that nearest sample
+
+            Loop(this.snake.sampleCount, ({ i }) =>
+            {
+                const sample = this.snake.samplesUniform.element(i).xz // x and z of i sample 
+                const distance = xz.distance(sample) // distance between blade base and sample pos
+
+                If(distance.lessThan(closestDistance), () =>
+                {
+                    closestDistance.assign(distance)
+                    closestPoint.assign(sample)
+                })
+            })
+
+            // Save direction and distance, the material turns them into bend and height
+            const direction = xz.sub(closestPoint).normalize() // from the sample to the blade
+            this.bends.element(instanceIndex).assign(vec3(direction, closestDistance)) // overwrite bends array : x, y = direction, z = distance
+
+
         })().compute(this.count)
     }
 
@@ -101,7 +132,12 @@ export default class Grass
             colorTint: uniform(new THREE.Color('#ec6d18')),
             colorNoiseFrequency: uniform(0.26),
             colorNoiseAmplitude: uniform(0.5),
-            tintStrength: uniform(1.73)
+            tintStrength: uniform(1.73),
+
+            bendRadius: uniform(0.3),
+            bendStrength: uniform(0.4),
+            shrinkRadius: uniform(0.4),
+            shrinkHeight: uniform(0) // height multiplier on the body : 0 = no blade, 1 = full height
         }
 
         this.material = new THREE.MeshBasicNodeMaterial()
@@ -122,9 +158,23 @@ export default class Grass
 
         const localY = positionLocal.y.mul(this.uniforms.height).mul(heightFactor)
 
+        /** Snake bending */
+        const bend = this.bends.element(instanceIndex) // retrieve bends infos with index
+        const snakeDirection = bend.xy // from the snake to the blade
+        const snakeDistance = bend.z // distance value
+
+        const bendAmount = snakeDistance.div(this.uniforms.bendRadius).oneMinus().max(0) // how close to the snake : 1 on body → 0 at radius
+        const tipWeight = positionLocal.y.pow(2) // create bend weight for blade : 0 at base, 1 at the tip = the base stays planted
+        // bend : bend direction * bend strength with radius * push strength * tip weight
+        const bendOffset = vec3(snakeDirection.x, 0, snakeDirection.y).mul(bendAmount).mul(this.uniforms.bendStrength).mul(tipWeight)
+
+        /** Snake shrink */
+        const shrinkProgress = snakeDistance.div(this.uniforms.shrinkRadius).min(1) // how close to the snake : 0 on body → 1 the radius
+        const shrink = mix(this.uniforms.shrinkHeight, 1, shrinkProgress) // height multiplier : shrinkHeight on the body → 1 far away
+
         this.material.positionNode = bladePosition
             .add(right.mul(localX))
-            .add(vec3(0, localY, 0))
+            .add(vec3(0, localY, 0).add(bendOffset).mul(shrink)) // shrink multiply = scale the height and the bend together
 
         const color = mix(this.uniforms.colorBottom, this.uniforms.colorTop, uv().y)
 
