@@ -4,6 +4,7 @@ import Terrain from './Terrain'
 import Grass from './Grass'
 import Sphere from './Sphere'
 import Snake from './Snake'
+import Wind from './Wind'
 import Marker from './Marker'
 import Raycaster from '../Raycaster'
 
@@ -19,6 +20,7 @@ export default class World
 
         this.environment = new Environment()
         this.terrain = new Terrain()
+        this.wind = new Wind()
         this.marker = new Marker(this.terrain)
         this.raycaster = new Raycaster(this.terrain)
 
@@ -39,7 +41,7 @@ export default class World
         this.ressources.on('loaded', () => 
         {
             this.snake = new Snake(this.terrain)
-            this.grass = new Grass(this.terrain, this.snake)
+            this.grass = new Grass(this.terrain, this.snake, this.wind)
         })
     }
 

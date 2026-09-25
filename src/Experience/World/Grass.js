@@ -5,13 +5,14 @@ import Experience from '../Experience'
 
 export default class Grass
 {
-    constructor(terrain, snake)
+    constructor(terrain, snake, wind)
     {
         this.experience = new Experience()
         this.scene = this.experience.scene
         this.debug = this.experience.debug
         this.terrain = terrain
         this.snake = snake
+        this.wind = wind
 
         if(this.debug.active)
         {
@@ -136,7 +137,7 @@ export default class Grass
 
             bendRadius: uniform(0.3),
             bendStrength: uniform(0.4),
-            shrinkRadius: uniform(0.4),
+            shrinkRadius: uniform(0.2),
             shrinkHeight: uniform(0) // height multiplier on the body : 0 = no blade, 1 = full height
         }
 
@@ -168,13 +169,17 @@ export default class Grass
         // bend : bend direction * bend strength with radius * push strength * tip weight
         const bendOffset = vec3(snakeDirection.x, 0, snakeDirection.y).mul(bendAmount).mul(this.uniforms.bendStrength).mul(tipWeight)
 
+        /** Wind bending */
+        const wind = this.wind.offsetNode(bladePosition.xz) // push (x, z) at the blade base : the whole blade leans together
+        const windOffset = vec3(wind.x, 0, wind.y).mul(tipWeight) // same tip weight as the snake : the base stays planted
+
         /** Snake shrink */
         const shrinkProgress = snakeDistance.div(this.uniforms.shrinkRadius).min(1) // how close to the snake : 0 on body → 1 the radius
         const shrink = mix(this.uniforms.shrinkHeight, 1, shrinkProgress) // height multiplier : shrinkHeight on the body → 1 far away
 
         this.material.positionNode = bladePosition
             .add(right.mul(localX))
-            .add(vec3(0, localY, 0).add(bendOffset).mul(shrink)) // shrink multiply = scale the height and the bend together
+            .add(vec3(0, localY, 0).add(bendOffset).add(windOffset).mul(shrink)) // shrink multiply = scale the height and the bends together
 
         const color = mix(this.uniforms.colorBottom, this.uniforms.colorTop, uv().y)
 
