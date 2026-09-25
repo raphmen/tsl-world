@@ -64,7 +64,7 @@ export default class Grass
 
     setInstances()
     {
-        this.gridSize = 150
+        this.gridSize = 250
         this.count = this.gridSize * this.gridSize
         const spacing = this.terrain.size / this.gridSize
 

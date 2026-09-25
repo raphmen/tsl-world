@@ -51,7 +51,7 @@ export default class Terrain
 
     setMesh()
     {
-        this.size = 10
+        this.size = 20
 
         const geometry = new THREE.PlaneGeometry(this.size, this.size, 128, 128)
         geometry.rotateX(-Math.PI * 0.5)
