@@ -28,9 +28,13 @@ export default class World
             this.marker.setPosition(point)
         })
 
-        this.raycaster.on('click', () =>
+        this.raycaster.on('click', (point) =>
         {
             this.marker.click()
+
+            // the snake loads with the ressources, so it may not exist yet
+            if(this.snake)
+                this.snake.setTarget(point)
         })
 
         this.ressources.on('loaded', () => 
@@ -44,5 +48,8 @@ export default class World
         if (this.grass) {
             this.grass.update()       
         }
+
+        if(this.snake)
+            this.snake.update()
     }
 }

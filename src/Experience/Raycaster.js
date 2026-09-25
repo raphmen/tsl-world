@@ -38,7 +38,6 @@ export default class Raycaster extends EventEmitter
             const point = this.cast()
             if(!point) return
 
-            console.log('terrain click', point.x.toFixed(2), point.y.toFixed(2), point.z.toFixed(2))
             this.trigger('click', [point])
         })
 
